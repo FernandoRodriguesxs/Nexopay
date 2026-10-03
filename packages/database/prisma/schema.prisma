@@ -1,9 +1,10 @@
 // NexoPay — schema do banco.
 // Regras:
 // - Valores monetários SEMPRE em centavos inteiros (Int/BigInt). Nunca Float/Decimal para dinheiro.
-// - Toda entidade de tenant possui merchantId.
-// - IDs públicos (pay_, cus_, ...) são colunas próprias; IDs internos não são expostos.
-// Os models são introduzidos na Etapa C (Foundation).
+// - Todo recurso de tenant possui merchantId + environment; índices compostos começam por eles.
+// - Entidades públicas usam o ID prefixado (`mer_<ULID>`) como chave primária, gerado pela aplicação.
+// - Entidades internas (Session, MerchantMember, IdempotencyKey, AuditLog) usam UUID.
+// - Tabelas e colunas em snake_case no PostgreSQL.
 
 generator client {
   provider            = "prisma-client"
@@ -14,4 +15,173 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Environment {
+  SANDBOX
+  PRODUCTION
+
+  @@map("environment")
+}
+
+enum MerchantRole {
+  OWNER
+  ADMIN
+  DEVELOPER
+
+  @@map("merchant_role")
+}
+
+enum AuditActorType {
+  USER
+  API_KEY
+  SYSTEM
+
+  @@map("audit_actor_type")
+}
+
+enum IdempotencyKeyStatus {
+  IN_PROGRESS
+  COMPLETED
+
+  @@map("idempotency_key_status")
+}
+
+/// Pessoa que acessa o dashboard. `email` é sempre armazenado normalizado (minúsculas).
+model User {
+  id           String   @id // usr_<ULID>
+  email        String   @unique
+  passwordHash String   @map("password_hash") // PHC: $argon2id$v=19$m=...,t=...,p=...$salt$hash
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  memberships    MerchantMember[]
+  sessions       Session[]
+  createdApiKeys ApiKey[]         @relation("ApiKeyCreatedBy")
+  revokedApiKeys ApiKey[]         @relation("ApiKeyRevokedBy")
+
+  @@map("user")
+}
+
+/// Sessão server-side do dashboard. Apenas o SHA-256 do token é armazenado.
+model Session {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id")
+  tokenHash         String    @unique @map("token_hash")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt        DateTime  @map("last_seen_at") @db.Timestamptz(3)
+  /// Expiração por inatividade (renovação deslizante, limitada por absoluteExpiresAt).
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
+  absoluteExpiresAt DateTime  @map("absolute_expires_at") @db.Timestamptz(3)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("session")
+}
+
+/// Tenant. Unidade de isolamento de todos os recursos de negócio.
+model Merchant {
+  id        String   @id // mer_<ULID>
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  members         MerchantMember[]
+  apiKeys         ApiKey[]
+  idempotencyKeys IdempotencyKey[]
+  auditLogs       AuditLog[]
+
+  @@map("merchant")
+}
+
+/// Vínculo User ⟷ Merchant com papel. Um usuário tem no máximo um vínculo por Merchant.
+model MerchantMember {
+  id         String       @id @default(uuid()) @db.Uuid
+  merchantId String       @map("merchant_id")
+  userId     String       @map("user_id")
+  role       MerchantRole
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([merchantId, userId])
+  @@index([userId])
+  @@map("merchant_member")
+}
+
+/// Credencial da API pública. Nunca em texto puro: `hash` = HMAC-SHA256(pepper, key).
+model ApiKey {
+  id              String      @id // key_<ULID>
+  merchantId      String      @map("merchant_id")
+  environment     Environment
+  name            String
+  hash            String      @unique
+  hint            String
+  createdByUserId String      @map("created_by_user_id")
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt      DateTime?   @map("last_used_at") @db.Timestamptz(3)
+  revokedAt       DateTime?   @map("revoked_at") @db.Timestamptz(3)
+  revokedByUserId String?     @map("revoked_by_user_id")
+
+  merchant  Merchant @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  createdBy User     @relation("ApiKeyCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  revokedBy User?    @relation("ApiKeyRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+
+  /// Listagem do dashboard (mais recentes primeiro) sempre filtrada por tenant + ambiente.
+  @@index([merchantId, environment, id(sort: Desc)])
+  @@map("api_key")
+}
+
+/// Base da idempotência de POST /v1/payments (algoritmo implementado na Etapa D — ARCHITECTURE §8).
+model IdempotencyKey {
+  id             String               @id @default(uuid()) @db.Uuid
+  merchantId     String               @map("merchant_id")
+  environment    Environment
+  key            String               @db.VarChar(255)
+  /// SHA-256 de método + rota + body canônico.
+  requestHash    String               @map("request_hash")
+  status         IdempotencyKeyStatus
+  /// ID reservado do recurso criado (ex.: pay_<ULID>).
+  resourceId     String?              @map("resource_id")
+  responseStatus Int?                 @map("response_status")
+  responseBody   Json?                @map("response_body")
+  lockedAt       DateTime             @map("locked_at") @db.Timestamptz(3)
+  expiresAt      DateTime             @map("expires_at") @db.Timestamptz(3)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+
+  @@unique([merchantId, environment, key])
+  @@index([expiresAt])
+  @@map("idempotency_key")
+}
+
+/// Trilha de auditoria append-only. Gravada na mesma transação da ação auditada.
+model AuditLog {
+  id           String         @id @default(uuid()) @db.Uuid
+  /// Nulo para ações sem tenant (ex.: user.logged_in).
+  merchantId   String?        @map("merchant_id")
+  environment  Environment?
+  actorType    AuditActorType @map("actor_type")
+  actorId      String?        @map("actor_id")
+  action       String
+  resourceType String?        @map("resource_type")
+  resourceId   String?        @map("resource_id")
+  /// Metadata já redigida pela aplicação (sem secrets/PII).
+  metadata     Json?
+  ipAddress    String?        @map("ip_address")
+  userAgent    String?        @map("user_agent")
+  requestId    String?        @map("request_id")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  merchant Merchant? @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+
+  @@index([merchantId, createdAt(sort: Desc)])
+  @@index([actorType, actorId, createdAt(sort: Desc)])
+  @@map("audit_log")
 }
