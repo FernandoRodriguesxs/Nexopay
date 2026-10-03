@@ -7,6 +7,8 @@ const validApiEnv = {
   API_PUBLIC_URL: 'http://localhost:4000',
   DATABASE_URL: 'postgresql://user:super-secret-password@localhost:5432/db',
   REDIS_URL: 'redis://localhost:6379',
+  API_KEY_PEPPER: 'a-test-pepper-with-at-least-32-characters',
+  DASHBOARD_ORIGIN: 'http://localhost:3000/',
 };
 
 describe('parseEnv', () => {
@@ -16,6 +18,18 @@ describe('parseEnv', () => {
     expect(env.API_PORT).toBe(4000);
     expect(env.LOG_LEVEL).toBe('info');
     expect(env.NODE_ENV).toBe('test');
+  });
+
+  it('normalizes the dashboard origin', () => {
+    const env = parseEnv(apiEnvSchema, validApiEnv);
+
+    expect(env.DASHBOARD_ORIGIN).toBe('http://localhost:3000');
+  });
+
+  it('rejects a short API key pepper', () => {
+    expect(() => parseEnv(apiEnvSchema, { ...validApiEnv, API_KEY_PEPPER: 'short' })).toThrow(
+      EnvValidationError,
+    );
   });
 
   it('coerces numeric variables', () => {
