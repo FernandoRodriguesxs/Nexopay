@@ -1,0 +1,40 @@
+{
+  "name": "@nexopay/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Documentação developer-first da API NexoPay.",
+  "scripts": {
+    "dev": "next dev --port 3002",
+    "build": "next build",
+    "start": "next start --port 3002",
+    "typecheck": "next typegen && tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rimraf .next .turbo"
+  },
+  "dependencies": {
+    "@mdx-js/loader": "catalog:",
+    "@mdx-js/react": "catalog:",
+    "@next/mdx": "catalog:",
+    "@nexopay/ui": "workspace:*",
+    "geist": "catalog:",
+    "lucide-react": "catalog:",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@nexopay/config": "workspace:*",
+    "@tailwindcss/postcss": "catalog:",
+    "@types/mdx": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "eslint": "catalog:",
+    "rimraf": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
