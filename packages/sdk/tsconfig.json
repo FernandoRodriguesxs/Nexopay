@@ -1,0 +1,8 @@
+{
+  "extends": "@nexopay/config/tsconfig/node-library.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src", "vitest.config.ts", "tsup.config.ts"]
+}
