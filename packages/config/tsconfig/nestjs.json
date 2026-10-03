@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "NexoPay NestJS (ESM)",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "outDir": "${configDir}/dist",
+    "rootDir": "${configDir}/src",
+    "declaration": false,
+    "declarationMap": false
+  }
+}

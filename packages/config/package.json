@@ -1,0 +1,48 @@
+{
+  "name": "@nexopay/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Configuração compartilhada: presets de TypeScript/ESLint e validação de environment variables.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./eslint/node": "./eslint/node.js",
+    "./eslint/nest": "./eslint/nest.js",
+    "./eslint/next": "./eslint/next.js",
+    "./eslint/react": "./eslint/react.js",
+    "./tsconfig/*": "./tsconfig/*"
+  },
+  "files": [
+    "dist",
+    "eslint",
+    "tsconfig"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "clean": "rimraf dist .turbo"
+  },
+  "dependencies": {
+    "@eslint/js": "catalog:",
+    "eslint-config-next": "catalog:",
+    "globals": "catalog:",
+    "typescript-eslint": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "rimraf": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

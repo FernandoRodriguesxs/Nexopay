@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "NexoPay Node library (ESM)",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "outDir": "${configDir}/dist",
+    "rootDir": "${configDir}/src"
+  }
+}
