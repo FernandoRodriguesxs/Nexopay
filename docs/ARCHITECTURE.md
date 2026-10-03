@@ -93,12 +93,15 @@ apps/api/src/
   app.module.ts
   shared/
     ids/                  # generateId('pay') → pay_<ULID>
-    errors/               # AppError + códigos + exception filter
-    http/                 # request-id middleware, logging interceptor, zod pipe, paginação
-    auth/                 # guards, AuthContext, decorators
-    database/             # PrismaService, UnitOfWork (AsyncLocalStorage)
-    queue/                # conexões BullMQ, nomes de filas
-    crypto/               # hashing de API key, scrypt, AES-GCM, HMAC
+    errors/               # AppError + mapa código→HTTP + exception filter
+    http/                 # request id/contexto, body parser errors, zod pipe, checagem de Origin
+    auth/                 # políticas de rota (@Public/@ApiKeyAuth/@SessionAuth) e param decorators
+    database/             # DatabaseService (Prisma), UnitOfWork (AsyncLocalStorage)
+    tenancy/              # ambientes habilitados (PRODUCTION desabilitado no MVP)
+    rate-limit/           # porta RateLimiter + implementação Redis (janela fixa)
+    redis/                # conexão Redis (prefixo nexopay:)
+    clock/                # fonte única de "agora"
+    queue/                # conexões BullMQ, nomes de filas (Etapa D/E)
   modules/
     health/
     auth/                 # signup, login, logout, sessões
@@ -146,9 +149,12 @@ payments/
 ```text
 Request
   │
-  ├─ RequestIdMiddleware     gera req_<ULID>; header X-Request-Id
-  ├─ Helmet / CORS / body limit (100 kb)
-  ├─ AuthGuard               API Key ou sessão → AuthContext (merchantId, environment, actor)
+  ├─ RequestIdMiddleware     gera req_<ULID>; header X-Request-Id; log de conclusão do request
+  ├─ Helmet / CORS (só a origem do dashboard, com credenciais)
+  ├─ Body parser JSON (100 kb) — erros de parse/tamanho já respondem no contrato de erro
+  ├─ RequestContext (ALS)    requestId/merchantId/environment em toda linha de log
+  ├─ AuthGuard (global)      política declarada na rota; sem política → negado
+  │                          API Key ou sessão → TenantContext (merchantId, environment, actor)
   ├─ ZodValidationPipe       valida body/query/params com schemas de @nexopay/contracts
   ├─ Controller              monta input → use case
   │     └─ UseCase → Domain → Repository/Provider → Infrastructure
@@ -181,25 +187,29 @@ Request
 
 | HTTP | Código(s)                                                                                                                 |
 | ---- | ------------------------------------------------------------------------------------------------------------------------- |
-| 400  | `VALIDATION_ERROR`                                                                                                        |
+| 400  | `VALIDATION_ERROR` (inclui JSON malformado e headers inválidos)                                                           |
 | 401  | `UNAUTHENTICATED`, `INVALID_API_KEY`, `API_KEY_REVOKED`, `INVALID_CREDENTIALS`                                            |
-| 403  | `FORBIDDEN`, `SANDBOX_ONLY`                                                                                               |
+| 403  | `FORBIDDEN`, `INVALID_ORIGIN`, `ENVIRONMENT_NOT_ENABLED`, `SANDBOX_ONLY`                                                  |
 | 404  | `RESOURCE_NOT_FOUND`, `ROUTE_NOT_FOUND`                                                                                   |
 | 409  | `IDEMPOTENCY_CONFLICT`, `IDEMPOTENCY_IN_PROGRESS`, `INVALID_PAYMENT_STATE`, `PAYMENT_EXPIRED`, `EMAIL_ALREADY_REGISTERED` |
-| 429  | `RATE_LIMITED`                                                                                                            |
+| 413  | `PAYLOAD_TOO_LARGE`                                                                                                       |
+| 429  | `RATE_LIMITED` (+ header `Retry-After`)                                                                                   |
 | 500  | `INTERNAL_ERROR` (mensagem genérica; detalhes só no log com o `requestId`)                                                |
 
-Erros de domínio são classes tipadas (`PaymentExpiredError`) mapeadas para códigos no filter. Stack traces nunca vão para a resposta.
+- Códigos e o schema do corpo vivem em `@nexopay/contracts` (`ERROR_CODES`, `errorResponseSchema`).
+- Erros esperados são `AppError(code, message, details?)`; o mapa código → HTTP fica no filter.
+- Qualquer outra exceção (Prisma, rede, bug) vira `INTERNAL_ERROR` com mensagem fixa — a mensagem
+  original, stack e SQL vão apenas para o log, com o mesmo `requestId`.
+- Erros do body parser acontecem antes do Nest e são convertidos por um handler Express próprio.
 
 ---
 
 ## 5. Autenticação
 
-Dois tipos de credencial, um único `AuthContext`:
+Dois mecanismos **separados**, que resolvem o mesmo `TenantContext` para os use cases:
 
 ```ts
-type AuthContext = {
-  requestId: string;
+type TenantContext = {
   merchantId: string; // mer_...
   environment: 'SANDBOX' | 'PRODUCTION';
   actor:
@@ -207,23 +217,51 @@ type AuthContext = {
 };
 ```
 
+Toda rota declara **uma** política, aplicada por um `AuthGuard` global (rota sem política → negada):
+
+| Decorator                          | Credencial aceita                                     | Uso                       |
+| ---------------------------------- | ----------------------------------------------------- | ------------------------- |
+| `@Public()`                        | nenhuma                                               | `/health`                 |
+| `@Public({ checkOrigin: true })`   | nenhuma, mas exige `Origin` do dashboard em mutações  | signup, login             |
+| `@ApiKeyAuth()`                    | só `Authorization: Bearer sk_...` (cookies ignorados) | API pública               |
+| `@SessionAuth()`                   | só o cookie `np_session` (`Authorization` ignorado)   | `/v1/auth/me`, logout     |
+| `@SessionAuth({ merchant: true })` | cookie + `X-NexoPay-Merchant` com vínculo do usuário  | `/v1/api-keys`, dashboard |
+
+Uma credencial nunca serve de fallback para a outra. API Key em rota de sessão → `403 FORBIDDEN`.
+
 ### 5.1 API Key (API pública)
 
 - Header: `Authorization: Bearer sk_test_...`.
-- Formato: `sk_test_` + 32 bytes aleatórios em base62.
-- Armazenamento: `hash = HMAC-SHA256(API_KEY_PEPPER, key)` com índice único → lookup O(1).
+- Formato: `sk_test_` | `sk_live_` + 32 bytes aleatórios em base62 (43 caracteres, 256 bits).
+- Armazenamento: `hash = HMAC-SHA256(API_KEY_PEPPER, key)` (hex) com índice único → lookup O(1).
   Keys têm 256 bits de entropia, então hash lento (bcrypt/argon2) não agrega segurança e impediria o lookup determinístico.
-- O ambiente vem do prefixo e é conferido contra o ambiente armazenado.
-- `lastUsedAt` atualizado com throttling (no máximo 1×/min por key).
+  O pepper fica fora do banco: um dump sozinho não permite validar keys offline. Trocar o pepper invalida todas as keys.
+- Fluxo: formato (regex) → HMAC → `findUnique(hash)` → ambiente do prefixo = ambiente armazenado →
+  não revogada → ambiente habilitado → `TenantContext`.
+  Falhas: `INVALID_API_KEY` (formato, inexistente, prefixo adulterado), `API_KEY_REVOKED`,
+  `ENVIRONMENT_NOT_ENABLED` (`sk_live_` no MVP).
+- Persistimos `hint` (`sk_test_…a1b2`) para exibição; o valor completo é devolvido uma única vez (`secret`).
+- `lastUsedAt` atualizado com throttling (no máximo 1×/min por key, update condicional).
+- `GET /v1/whoami` devolve merchant, ambiente e key em uso (útil para o dev validar a integração).
 
 ### 5.2 Sessão (dashboard)
 
 - `POST /v1/auth/signup | login | logout`, `GET /v1/auth/me`.
-- Senha: `scrypt` (`node:crypto`, parâmetros OWASP, salt por usuário).
-- Sessão: token de 32 bytes no cookie `np_session` (`HttpOnly`, `Secure` em produção, `SameSite=Lax`); no banco apenas `SHA-256(token)`. Expiração com renovação deslizante.
-- Merchant ativo: header `X-NexoPay-Merchant: mer_...` (membership verificada a cada request).
-- Ambiente no dashboard: header `X-NexoPay-Environment` (padrão `SANDBOX`; `PRODUCTION` rejeitado no MVP).
-- CSRF: `SameSite=Lax` + verificação de `Origin` contra allowlist em requests mutáveis com sessão.
+- Senha: **Argon2id** via `crypto.argon2` nativo do Node 24 (sem dependência nativa), parâmetros mínimos
+  da OWASP (m = 19 MiB, t = 2, p = 1), salt de 16 bytes, formato PHC. Hashes com parâmetros antigos são
+  re-hasheados no próximo login. Senha: 10–256 caracteres.
+- Login: mesma resposta (`INVALID_CREDENTIALS`) para email inexistente e senha errada; email inexistente
+  executa um Argon2 "dummy" para igualar o tempo de resposta. Rate limit (Redis, janela fixa):
+  login 10/15 min por email e 30/15 min por IP; signup 10/h por IP. Chaves do Redis usam SHA-256 do IP/email.
+- Sessão: token de 32 bytes (base64url) no cookie `np_session` (`HttpOnly`, `Secure` em produção,
+  `SameSite=Lax`, `Path=/`, host-only); no banco apenas `SHA-256(token)`.
+  Expiração por inatividade de 12 h com renovação deslizante (gravada no máximo a cada 5 min) e
+  expiração absoluta de 7 dias. Logout revoga no servidor (`revokedAt`).
+- Merchant ativo: header `X-NexoPay-Merchant: mer_...` (membership verificada a cada request; sem vínculo → 404).
+- Ambiente no dashboard: header `X-NexoPay-Environment` (padrão `SANDBOX`; `PRODUCTION` → `403 ENVIRONMENT_NOT_ENABLED` no MVP).
+- CSRF: `SameSite=Lax` + `Origin` obrigatório e igual a `DASHBOARD_ORIGIN` em todo método mutável
+  com sessão **e** em signup/login (login CSRF). `Origin` ausente é rejeitado (`403 INVALID_ORIGIN`).
+  CORS com credenciais só para `DASHBOARD_ORIGIN`.
 
 ### 5.3 Matriz de acesso
 
@@ -231,6 +269,7 @@ type AuthContext = {
 | -------------------------------------------------------------------- | :---------------------: | :----: |
 | `/v1/customers`, `/v1/payments`, `/v1/webhook-endpoints`             |           ✅            |   ✅   |
 | `/v1/test/payments/:id/confirm` (sandbox)                            |           ✅            |   ✅   |
+| `/v1/whoami`                                                         |           ✅            |   ❌   |
 | `/v1/api-keys` (criar, listar, revogar)                              |           ❌            |   ✅   |
 | `/v1/auth/*`, `/v1/merchants/*`                                      |           ❌            |   ✅   |
 | `/v1/dashboard/*` (read models internos: overview, logs, deliveries) |           ❌            |   ✅   |
@@ -251,9 +290,13 @@ type AuthContext = {
   findById(scope: TenantScope, id: PaymentId): Promise<Payment | null>
   ```
 
-  Não existe `findById(id)` sem escopo para recursos de tenant.
+  Não existe `findById(id)` sem escopo para recursos de tenant. Única exceção documentada:
+  `ApiKeyRepository.findByHash`, que é justamente o que **resolve** o tenant de uma API Key.
 
+- O escopo vem sempre da credencial (API Key) ou do vínculo verificado (sessão + `X-NexoPay-Merchant`),
+  nunca do corpo do request.
 - Índices compostos começam por `(merchantId, environment, ...)`.
+- Ambientes habilitados ficam em `shared/tenancy/environment-policy.ts` (`SANDBOX` no MVP).
 - Relações cruzadas (ex.: `customerId` em Payment) são validadas no mesmo escopo.
 - Recurso de outro tenant → **404** `RESOURCE_NOT_FOUND`.
 - Testes de integração dedicados para cada recurso (Merchant A não lê/altera dados do Merchant B).
@@ -442,9 +485,17 @@ X-NexoPay-Signature: v1=<hex(HMAC_SHA256(secret, "<timestamp>.<rawBody>"))>
 
 ## 14. Observabilidade
 
-- **Logs:** pino JSON em stdout com `service`, `requestId`, `merchantId`, `environment`, rota, status e duração. Redaction de `authorization`, cookies, secrets, tokens, senhas, `taxId`, `email`.
+- **Logs:** pino JSON em stdout com `service`, `requestId`, `merchantId`, `environment`, rota (sem query string), status e duração.
+  Uma linha por request (`request completed` / `request failed`); `requestId`, `merchantId` e `environment` entram
+  automaticamente em toda linha emitida durante o request (AsyncLocalStorage).
+- **Redaction (`@nexopay/logger`):** cópia profunda de cada linha, em qualquer profundidade, redigindo chaves sensíveis
+  (`authorization`, `cookie`, `set-cookie`, `password*`, `secret*`, `token*`, `apiKey`, `pepper`, `email`, `taxId`, `cpf`,
+  `cnpj`, `phone`, ...; sem diferenciar caixa/`-`/`_`) e mascarando padrões de secret dentro de qualquer string — inclusive
+  mensagens, `err.message` e stack: `sk_test_…`/`sk_live_…`, `whsec_…`, `Bearer …` e credenciais em URLs (`postgres://user:***@`).
 - **Nunca** `console.log` (regra de lint `no-console`).
-- **Request ID:** `req_<ULID>` em todo request (header `X-Request-Id`, corpo de erro, log, Developer Log).
+- **Request ID:** `req_<ULID>` gerado pela NexoPay em todo request (header `X-Request-Id`, corpo de erro, log, Developer Log).
+  Um `X-Request-Id` enviado pelo cliente **nunca** substitui o nosso (evita colisão/forja no Developer Log): se for válido
+  (`[A-Za-z0-9._:-]{1,128}`), é registrado como `clientRequestId` no log para correlação; caso contrário, é ignorado.
 - **Developer Logs (`ApiRequest`):** método, path, status, duração, ator, `Idempotency-Key`, código de erro, corpos redigidos e truncados (8 KB). Gravado após a resposta, sem impactar latência; falha ao gravar não quebra o request. Retenção: 30 dias.
 - **Health:** `/health` (liveness) e `/health/ready` (PostgreSQL + Redis).
 - **Futuro:** OpenTelemetry (traces + métricas), métricas de filas, alertas de taxa de falha de webhooks.
@@ -454,14 +505,15 @@ X-NexoPay-Signature: v1=<hex(HMAC_SHA256(secret, "<timestamp>.<rawBody>"))>
 - Ações auditadas: `user.signed_up`, `user.logged_in`, `api_key.created`, `api_key.revoked`, `webhook_endpoint.created`, `webhook_endpoint.updated`, `payment.sandbox_confirmed`, `merchant.updated`.
 - Campos: ator (`USER` | `API_KEY` | `SYSTEM`), ação, recurso, metadata redigida, IP, user-agent, `requestId`, data.
 - Gravado na **mesma transação** da ação auditada.
-- Append-only: o repositório não expõe update/delete (futuro: `REVOKE UPDATE, DELETE` no banco).
+- Append-only: o código não expõe update/delete e um trigger no PostgreSQL rejeita `UPDATE`/`DELETE` em `audit_log`.
+- Implementado na fundação: `user.signed_up`, `user.logged_in`, `api_key.created`, `api_key.revoked`.
 
 ## 16. Segurança
 
 | Tema               | Medida                                                                                   |
 | ------------------ | ---------------------------------------------------------------------------------------- |
 | API Keys           | HMAC-SHA256 + pepper; exibição única; revogação imediata; dica `sk_test_…a1b2`.          |
-| Senhas             | scrypt com salt; mensagens de login genéricas; rate limit em login/signup.               |
+| Senhas             | Argon2id (OWASP) com salt; mensagens de login genéricas; rate limit em login/signup.     |
 | Sessões            | Token aleatório, hash no banco, cookie HttpOnly/Secure/SameSite=Lax, logout server-side. |
 | Secrets de webhook | AES-256-GCM com chave versionada (permite rotação).                                      |
 | Secrets de infra   | Somente via environment; validados no boot; nunca logados; `.env` fora do git.           |
@@ -511,6 +563,14 @@ Até lá, `Transaction` é o registro financeiro de verdade e já nasce imutáve
 | E2E da API | HTTP completo com Supertest                               | PostgreSQL + Redis          |
 | Webhooks   | Worker contra servidor HTTP local (sucesso, falha, retry) | PostgreSQL + Redis          |
 
+- Testes da API exigem a infra local (`pnpm infra:up`): o `globalSetup` do Vitest aplica as migrations em
+  `TEST_DATABASE_URL` (`nexopay_test`). Testes nunca truncam tabelas — cada um cria seus próprios merchants,
+  o que também exercita o isolamento com dados de outros testes rodando em paralelo.
+- Nos e2e o `RateLimiter` é substituído por uma implementação em memória (o Redis real tem teste de integração próprio).
+- Fundação (Etapa C): isolamento Merchant A × B e SANDBOX × PRODUCTION, API Key revogada/inválida, key nunca
+  persistida, secrets fora dos logs, API Key sem acesso à administração de keys, sessão inválida/expirada/revogada,
+  CSRF por `Origin`, request ID em sucesso e erro, erros internos sem vazamento, constraints do banco.
+
 Casos obrigatórios: Payment criado · Payment inválido · Merchant errado · API Key inválida · API Key revogada ·
 Idempotency retry · Idempotency conflict · Payment confirm · Payment confirm duplicado (inclusive concorrente) ·
 Webhook signature · Webhook retry.
@@ -528,7 +588,7 @@ Webhook signature · Webhook retry.
 | 5   | ID público prefixado (`pay_<ULID>`) como chave primária           | UUID interno + coluna pública             |
 | 6   | Coluna `environment` em todos os recursos de tenant               | Bancos separados por ambiente             |
 | 7   | API Key com HMAC-SHA256 + pepper                                  | bcrypt/argon2 (impede lookup)             |
-| 8   | Senhas com scrypt (`node:crypto`)                                 | Dependência nativa de argon2              |
+| 8   | Senhas com Argon2id nativo (`crypto.argon2`, Node ≥ 24.7)         | scrypt; pacote nativo `argon2`            |
 | 9   | Unit of Work via AsyncLocalStorage                                | Passar `tx` manualmente por toda a cadeia |
 | 10  | Outbox transacional + BullMQ, um job por tentativa de webhook     | Envio síncrono / retry só em memória      |
 | 11  | Idempotência no PostgreSQL                                        | Redis (sem garantia transacional)         |

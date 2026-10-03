@@ -127,7 +127,7 @@ Formato: _Dado / Quando / Então_. Todos os critérios valem para o ambiente **S
 - **Cadastro**: dado um email não cadastrado e senha com no mínimo 10 caracteres, quando o usuário se cadastra, então são criados `User`, `Merchant` e `MerchantMember (OWNER)` e uma sessão é iniciada.
 - Email já cadastrado → erro `EMAIL_ALREADY_REGISTERED` sem revelar dados da conta existente.
 - **Login** com credenciais inválidas → `INVALID_CREDENTIALS` (mensagem genérica; mesma resposta para email inexistente e senha errada).
-- Senhas armazenadas apenas como hash (scrypt); nunca logadas.
+- Senhas armazenadas apenas como hash (Argon2id); nunca logadas.
 - Sessão em cookie `HttpOnly`, `Secure` (produção), `SameSite=Lax`; logout invalida a sessão no servidor.
 - Tentativas de login com rate limit.
 

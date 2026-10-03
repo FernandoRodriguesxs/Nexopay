@@ -95,7 +95,8 @@ Entidades **internas** (nunca expostas pela API): `MerchantMember`, `Session`, `
 **User** é a pessoa que acessa o dashboard (email + senha). **MerchantMember** liga User ↔ Merchant com um papel.
 
 - Papéis: `OWNER` (MVP). `ADMIN` e `DEVELOPER` previstos no modelo; convites ficam para a fase 1.1.
-- Senha armazenada somente como hash (scrypt).
+- Senha armazenada somente como hash (Argon2id, formato PHC).
+- `email` é armazenado normalizado (minúsculas) e é único.
 - Sessões (`Session`) são registros do servidor com token aleatório armazenado como hash.
 
 ### 3.3 Customer
@@ -213,7 +214,7 @@ Invariantes:
 **É:** a credencial que autentica aplicações externas na API pública.
 
 - Formato: `sk_test_<segredo>` (sandbox) · `sk_live_<segredo>` (produção, futuro).
-- Persistido: `id (key_)`, `merchantId`, `environment`, `name`, `hash`, `hint` (`sk_test_…a1b2`), `lastUsedAt?`, `revokedAt?`, `createdBy`.
+- Persistido: `id (key_)`, `merchantId`, `environment`, `name`, `hash` (HMAC-SHA256 com pepper), `hint` (`sk_test_…a1b2`), `lastUsedAt?`, `revokedAt?`, `createdByUserId`, `revokedByUserId?`.
 - **Nunca** armazenada em texto puro; exibida uma única vez.
 - Revogação é imediata e irreversível.
 - Uma ApiKey identifica **Merchant + ambiente** de cada request.

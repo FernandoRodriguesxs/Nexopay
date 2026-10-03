@@ -48,6 +48,7 @@ cp .env.example .env     # variáveis locais (nunca versionar o .env)
 pnpm install
 pnpm infra:up            # PostgreSQL + Redis (docker compose)
 pnpm db:generate         # gera o Prisma Client
+pnpm db:migrate          # aplica as migrations no banco de desenvolvimento
 pnpm dev                 # sobe todos os apps em modo watch
 ```
 
@@ -67,3 +68,6 @@ pnpm dev                 # sobe todos os apps em modo watch
 | `pnpm infra:up/down` | Sobe/derruba PostgreSQL e Redis locais      |
 
 Para rodar algo em um único workspace: `pnpm --filter @nexopay/api test`.
+
+> Os testes da API rodam contra PostgreSQL e Redis reais: suba a infra (`pnpm infra:up`) antes de
+> `pnpm test`/`pnpm check`. As migrations são aplicadas automaticamente no banco `nexopay_test`.

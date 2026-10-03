@@ -51,6 +51,10 @@ documentada, atualize o documento no mesmo trabalho.
 ## Segurança e multi-tenancy
 
 - **Multi-tenancy por `merchantId`** (+ `environment`) em toda consulta de recurso de tenant. Nunca buscar recurso de tenant só por `id`.
+  Repositórios recebem `TenantScope` obrigatório; o escopo vem da credencial, nunca do body.
+- **Toda rota declara sua política de auth** (`@Public`, `@ApiKeyAuth`, `@SessionAuth`). Rota sem política é negada.
+  API Key e sessão nunca são fallback uma da outra; API Keys não administram API Keys.
+- Erros esperados: `AppError(code, ...)` com códigos de `@nexopay/contracts`. Nunca exponha mensagem de exceção desconhecida.
 - Recurso de outro merchant → **404**.
 - **API Keys nunca em plaintext**: armazene apenas o hash (HMAC + pepper); exiba a key uma única vez.
 - **Secrets nunca em logs**: `Authorization`, cookies, API keys, secrets de webhook, senhas, tokens. Dados pessoais (`taxId`, `email`) também não.
@@ -74,8 +78,9 @@ infraestrutura além de PostgreSQL + Redis.
 
 ```bash
 pnpm install            # dependências (pnpm usa Node 24 automaticamente)
-pnpm infra:up           # PostgreSQL + Redis (docker compose)
+pnpm infra:up           # PostgreSQL + Redis (docker compose) — obrigatório para os testes da API
 pnpm dev                # todos os apps
+pnpm db:migrate         # aplica migrations no banco de desenvolvimento
 pnpm check              # format + lint + typecheck + test + build — rode antes de concluir
 pnpm --filter @nexopay/api test
 ```
