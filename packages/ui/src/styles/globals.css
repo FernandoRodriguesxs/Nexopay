@@ -1,0 +1,128 @@
+/*
+ * NexoPay — tema Tailwind v4.
+ * Os tokens vivem em .claude/skills/nexopay-design (fonte única de verdade).
+ * Aqui apenas mapeamos --np-* para classes Tailwind e para os nomes usados pelo shadcn/ui.
+ */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '../../../../.claude/skills/nexopay-design/styles.css';
+
+/* Escaneia os componentes compartilhados ao compilar o CSS dos apps. */
+@source '../';
+
+@theme inline {
+  /* Tipografia */
+  --font-sans: var(--np-font-sans);
+  --font-mono: var(--np-font-mono);
+  --text-xs: var(--np-text-xs);
+  --text-sm: var(--np-text-sm);
+  --text-base: var(--np-text-base);
+  --text-md: var(--np-text-md);
+  --text-lg: var(--np-text-lg);
+  --text-xl: var(--np-text-xl);
+  --text-2xl: var(--np-text-2xl);
+  --text-3xl: var(--np-text-3xl);
+
+  /* Radius por hierarquia */
+  --radius-sm: var(--np-radius-sm);
+  --radius-md: var(--np-radius-md);
+  --radius-lg: var(--np-radius-lg);
+  --radius-xl: var(--np-radius-xl);
+
+  /* Sombras */
+  --shadow-surface: var(--np-shadow-surface);
+  --shadow-overlay: var(--np-shadow-overlay);
+
+  /* Motion */
+  --ease-standard: var(--np-ease-standard);
+  --ease-enter: var(--np-ease-enter);
+  --ease-exit: var(--np-ease-exit);
+
+  /* Cores NexoPay */
+  --color-brand: var(--np-color-brand);
+  --color-brand-hover: var(--np-color-brand-hover);
+  --color-brand-pressed: var(--np-color-brand-pressed);
+  --color-brand-ink: var(--np-color-brand-ink);
+  --color-brand-subtle: var(--np-color-brand-subtle);
+  --color-on-brand: var(--np-color-on-brand);
+
+  --color-surface: var(--np-color-surface);
+  --color-surface-sunken: var(--np-color-surface-sunken);
+  --color-ink: var(--np-color-text);
+  --color-ink-secondary: var(--np-color-text-secondary);
+  --color-ink-tertiary: var(--np-color-text-tertiary);
+  --color-border-strong: var(--np-color-border-strong);
+  --color-divider: var(--np-color-divider);
+  --color-focus: var(--np-color-focus);
+  --color-danger: var(--np-color-danger);
+  --color-danger-hover: var(--np-color-danger-hover);
+
+  --color-sidebar: var(--np-color-sidebar);
+  --color-sidebar-raised: var(--np-color-sidebar-raised);
+  --color-sidebar-hover: var(--np-color-sidebar-hover);
+  --color-sidebar-border: var(--np-color-sidebar-border);
+  --color-sidebar-text: var(--np-color-sidebar-text);
+  --color-sidebar-text-muted: var(--np-color-sidebar-text-muted);
+  --color-sidebar-active: var(--np-color-sidebar-active);
+  --color-sidebar-focus: var(--np-color-sidebar-focus);
+
+  --color-status-pending-fg: var(--np-color-status-pending-fg);
+  --color-status-pending-bg: var(--np-color-status-pending-bg);
+  --color-status-pending-border: var(--np-color-status-pending-border);
+  --color-status-paid-fg: var(--np-color-status-paid-fg);
+  --color-status-paid-bg: var(--np-color-status-paid-bg);
+  --color-status-paid-border: var(--np-color-status-paid-border);
+  --color-status-failed-fg: var(--np-color-status-failed-fg);
+  --color-status-failed-bg: var(--np-color-status-failed-bg);
+  --color-status-failed-border: var(--np-color-status-failed-border);
+  --color-status-expired-fg: var(--np-color-status-expired-fg);
+  --color-status-expired-bg: var(--np-color-status-expired-bg);
+  --color-status-expired-border: var(--np-color-status-expired-border);
+  --color-status-refunded-fg: var(--np-color-status-refunded-fg);
+  --color-status-refunded-bg: var(--np-color-status-refunded-bg);
+  --color-status-refunded-border: var(--np-color-status-refunded-border);
+
+  --color-sandbox: var(--np-color-sandbox);
+  --color-sandbox-fg: var(--np-color-sandbox-fg);
+  --color-sandbox-bg: var(--np-color-sandbox-bg);
+  --color-sandbox-border: var(--np-color-sandbox-border);
+
+  --color-code-bg: var(--np-color-code-bg);
+  --color-code-border: var(--np-color-code-border);
+  --color-code-text: var(--np-color-code-text);
+  --color-code-muted: var(--np-color-code-muted);
+  --color-code-string: var(--np-color-code-string);
+  --color-code-keyword: var(--np-color-code-keyword);
+  --color-code-number: var(--np-color-code-number);
+  --color-code-inline-bg: var(--np-color-code-inline-bg);
+
+  --color-http-2xx: var(--np-color-http-2xx);
+  --color-http-4xx: var(--np-color-http-4xx);
+  --color-http-5xx: var(--np-color-http-5xx);
+
+  /* Nomes esperados pelos componentes shadcn/ui */
+  --color-background: var(--np-color-background);
+  --color-foreground: var(--np-color-text);
+  --color-card: var(--np-color-surface);
+  --color-card-foreground: var(--np-color-text);
+  --color-popover: var(--np-color-surface);
+  --color-popover-foreground: var(--np-color-text);
+  --color-primary: var(--np-color-brand);
+  --color-primary-foreground: var(--np-color-on-brand);
+  --color-secondary: var(--np-color-surface-sunken);
+  --color-secondary-foreground: var(--np-color-text);
+  --color-muted: var(--np-color-surface-sunken);
+  --color-muted-foreground: var(--np-color-text-secondary);
+  --color-accent: var(--np-color-surface-sunken);
+  --color-accent-foreground: var(--np-color-text);
+  --color-destructive: var(--np-color-danger);
+  --color-border: var(--np-color-border);
+  --color-input: var(--np-color-border-strong);
+  --color-ring: var(--np-color-focus);
+}
+
+@layer base {
+  * {
+    border-color: var(--np-color-border);
+  }
+}
