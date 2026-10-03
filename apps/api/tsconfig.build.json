@@ -1,0 +1,5 @@
+{
+  "extends": "@nexopay/config/tsconfig/nestjs.json",
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

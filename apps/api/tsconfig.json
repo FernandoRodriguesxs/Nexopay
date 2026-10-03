@@ -1,0 +1,5 @@
+{
+  "extends": "@nexopay/config/tsconfig/nestjs.json",
+  "compilerOptions": { "rootDir": "." },
+  "include": ["src", "test", "vitest.config.ts"]
+}
