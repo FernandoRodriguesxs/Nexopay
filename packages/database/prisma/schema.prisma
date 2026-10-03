@@ -1,0 +1,17 @@
+// NexoPay — schema do banco.
+// Regras:
+// - Valores monetários SEMPRE em centavos inteiros (Int/BigInt). Nunca Float/Decimal para dinheiro.
+// - Toda entidade de tenant possui merchantId.
+// - IDs públicos (pay_, cus_, ...) são colunas próprias; IDs internos não são expostos.
+// Os models são introduzidos na Etapa C (Foundation).
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
