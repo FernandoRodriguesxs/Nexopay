@@ -7,5 +7,9 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     setupFiles: ['reflect-metadata'],
+    // Testes e2e usam PostgreSQL (nexopay_test) e Redis reais: `pnpm infra:up`.
+    globalSetup: ['test/global-setup.ts'],
+    testTimeout: 20_000,
+    hookTimeout: 30_000,
   },
 });
