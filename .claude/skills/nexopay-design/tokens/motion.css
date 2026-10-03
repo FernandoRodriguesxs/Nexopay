@@ -1,0 +1,24 @@
+/*
+ * NexoPay — Motion tokens.
+ * Movimento responde a ações (abrir, expandir, confirmar, copiar). Nada anima sozinho,
+ * com uma única exceção: a confirmação de pagamento no checkout.
+ */
+:root {
+  --np-duration-instant: 80ms; /* hover, pressed */
+  --np-duration-fast: 140ms; /* tooltips, popovers, troca de ícone do CopyButton */
+  --np-duration-base: 200ms; /* dialogs, sheets, expandir linhas */
+  --np-duration-slow: 320ms; /* confirmação de pagamento no checkout */
+
+  --np-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --np-ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --np-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --np-duration-instant: 0ms;
+    --np-duration-fast: 0ms;
+    --np-duration-base: 0ms;
+    --np-duration-slow: 0ms;
+  }
+}

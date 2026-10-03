@@ -1,0 +1,45 @@
+/*
+ * NexoPay Design System — entrada de estilos.
+ * Tokens + estilos base mínimos. Funciona com ou sem Tailwind:
+ * em @nexopay/ui este arquivo é importado DEPOIS de `tailwindcss`; o `@layer base`
+ * se funde ao layer base do Tailwind, então as utilities continuam vencendo.
+ */
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/motion.css';
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--np-color-background);
+    color: var(--np-color-text);
+    font-family: var(--np-font-sans);
+    font-size: var(--np-text-base);
+    line-height: var(--np-leading-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--np-font-mono);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--np-color-focus);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--np-color-brand-subtle);
+    color: var(--np-color-text);
+  }
+}

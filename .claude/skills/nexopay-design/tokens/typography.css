@@ -1,0 +1,35 @@
+/*
+ * NexoPay — Typography tokens.
+ * UI: Geist. Código e valores de máquina (IDs, keys, paths, payloads): Geist Mono.
+ * As variáveis --font-geist-* são injetadas pelo pacote `geist` nos apps Next.
+ */
+:root {
+  --np-font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --np-font-mono:
+    var(--font-geist-mono), ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Escala. O dashboard usa 14px como corpo; checkout e docs usam 16px. */
+  --np-text-xs: 0.75rem; /* 12 — metadados, legendas, rodapés de tabela */
+  --np-text-sm: 0.8125rem; /* 13 — labels, células secundárias, valores mono */
+  --np-text-base: 0.875rem; /* 14 — corpo do dashboard */
+  --np-text-md: 1rem; /* 16 — corpo do checkout e da documentação */
+  --np-text-lg: 1.125rem; /* 18 — título de seção/painel */
+  --np-text-xl: 1.375rem; /* 22 — título de página */
+  --np-text-2xl: 1.75rem; /* 28 — valor em destaque (detalhe do payment, métricas) */
+  --np-text-3xl: 2.25rem; /* 36 — valor no checkout */
+
+  --np-leading-tight: 1.2;
+  --np-leading-snug: 1.35;
+  --np-leading-normal: 1.5;
+  --np-leading-relaxed: 1.65; /* prosa na documentação */
+
+  --np-weight-regular: 400;
+  --np-weight-medium: 500;
+  --np-weight-semibold: 600;
+
+  --np-tracking-tight: -0.015em; /* títulos ≥ 22px e valores monetários grandes */
+  --np-tracking-normal: 0;
+
+  --np-measure: 72ch; /* largura máxima de prosa */
+}
