@@ -1,3 +1,9 @@
 export { createLogger } from './logger.js';
 export type { CreateLoggerOptions, Logger, LogLevel } from './logger.js';
-export { buildRedactPaths, REDACTED, SENSITIVE_KEYS } from './redaction.js';
+export {
+  createKeyMatcher,
+  REDACTED,
+  sanitizeLogObject,
+  scrubString,
+  SENSITIVE_KEYS,
+} from './redaction.js';

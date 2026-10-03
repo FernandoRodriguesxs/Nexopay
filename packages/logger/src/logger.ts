@@ -1,6 +1,6 @@
 import { pino } from 'pino';
-import type { DestinationStream, Logger as PinoLogger } from 'pino';
-import { buildRedactPaths, REDACTED } from './redaction.js';
+import type { DestinationStream, Logger as PinoLogger, LoggerOptions } from 'pino';
+import { createKeyMatcher, sanitizeLogObject, scrubString } from './redaction.js';
 
 export type Logger = PinoLogger;
 
@@ -16,22 +16,43 @@ export interface CreateLoggerOptions {
   readonly destination?: DestinationStream;
   /** Chaves sensíveis adicionais a serem redigidas. */
   readonly redactKeys?: readonly string[];
+  /** Campos de contexto adicionados a toda linha (ex.: requestId do request corrente). */
+  readonly context?: () => Record<string, unknown>;
+}
+
+function scrubArguments(args: unknown[]): unknown[] {
+  return args.map((arg) => (typeof arg === 'string' ? scrubString(arg) : arg));
 }
 
 export function createLogger(options: CreateLoggerOptions): Logger {
-  const { service, level = 'info', pretty = false, destination, redactKeys = [] } = options;
+  const {
+    service,
+    level = 'info',
+    pretty = false,
+    destination,
+    redactKeys = [],
+    context,
+  } = options;
+  const isSensitive = createKeyMatcher(redactKeys);
 
-  const config = {
+  const config: LoggerOptions = {
     level,
     base: { service },
     timestamp: pino.stdTimeFunctions.isoTime,
     messageKey: 'message',
+    ...(context ? { mixin: context } : {}),
+    // Erros já são serializados (e redigidos) por `sanitizeLogObject`.
+    serializers: { err: (value: unknown) => value },
     formatters: {
       level: (label: string) => ({ level: label }),
+      // Redaction profunda: roda antes dos serializers, sobre o objeto final da linha.
+      log: (object) => sanitizeLogObject(object, isSensitive),
     },
-    redact: {
-      paths: [...buildRedactPaths(), ...buildRedactPaths(redactKeys)],
-      censor: REDACTED,
+    hooks: {
+      // Mensagens livres (e argumentos de interpolação) também passam pelo scrub.
+      logMethod(args, method) {
+        method.apply(this, scrubArguments(args) as Parameters<typeof method>);
+      },
     },
   };
 
