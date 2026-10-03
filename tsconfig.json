@@ -1,0 +1,10 @@
+{
+  // Configuração raiz: apenas referência para editores e scripts da raiz.
+  // Cada workspace possui seu próprio tsconfig estendendo @nexopay/config/tsconfig/*.
+  "extends": "./packages/config/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "files": []
+}

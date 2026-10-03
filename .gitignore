@@ -1,0 +1,41 @@
+# Dependências
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma Client gerado
+packages/database/src/generated/
+
+# Turbo
+.turbo/
+
+# Testes
+coverage/
+
+# Environment (nunca versionar secrets)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Claude Code (configurações locais)
+.claude/settings.local.json

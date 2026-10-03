@@ -1,0 +1,77 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Versões centralizadas. Workspaces referenciam com "catalog:".
+catalog:
+  # Tooling
+  typescript: 6.0.3
+  turbo: 2.11.7
+  prettier: 3.9.9
+  rimraf: 6.1.3
+  eslint: 9.39.5
+  '@eslint/js': 9.39.5
+  typescript-eslint: 8.71.0
+  eslint-config-next: 16.3.8
+  globals: 17.13.0
+  vitest: 5.0.3
+  tsup: 8.5.1
+  '@types/node': 24.19.1
+
+  # Runtime compartilhado
+  zod: 4.6.5
+  pino: 10.4.0
+  pino-pretty: 13.1.3
+
+  # Frontend
+  next: 16.3.8
+  '@next/env': 16.3.8
+  '@next/mdx': 16.3.8
+  react: 19.3.0
+  react-dom: 19.3.0
+  '@types/react': 19.3.0
+  '@types/react-dom': 19.3.0
+  tailwindcss: 4.3.3
+  '@tailwindcss/postcss': 4.3.3
+  tw-animate-css: 1.4.0
+  '@tanstack/react-query': 5.104.1
+  lucide-react: 1.51.0
+  geist: 1.7.2
+  clsx: 2.1.1
+  tailwind-merge: 3.7.0
+  class-variance-authority: 0.7.1
+  '@mdx-js/loader': 3.1.1
+  '@mdx-js/react': 3.1.1
+  '@types/mdx': 2.0.14
+
+  # Backend
+  '@nestjs/common': 12.1.2
+  '@nestjs/core': 12.1.2
+  '@nestjs/platform-express': 12.1.2
+  '@nestjs/testing': 12.1.2
+  '@nestjs/cli': 12.0.8
+  reflect-metadata: 0.2.2
+  rxjs: 7.8.2
+  bullmq: 6.3.11
+  ioredis: 6.0.0
+  supertest: 7.3.1
+  '@types/supertest': 7.2.1
+  '@swc/core': 1.16.13
+  unplugin-swc: 2.0.0
+
+  # Database
+  prisma: 7.10.0
+  '@prisma/client': 7.10.0
+  '@prisma/adapter-pg': 7.10.0
+
+# pnpm 10 bloqueia scripts de instalação por padrão; liberamos apenas o necessário.
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@swc/core'
+  - '@nestjs/core'
+  - esbuild
+  - prisma
+  - sharp
+  - unrs-resolver
+  - msgpackr-extract

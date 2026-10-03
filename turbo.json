@@ -1,0 +1,38 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "globalDependencies": [".env", "tsconfig.json", ".claude/skills/nexopay-design/**/*.css"],
+  "globalEnv": ["NODE_ENV"],
+  "tasks": {
+    "db:generate": {
+      "inputs": ["prisma/**", "prisma.config.ts"],
+      "outputs": ["src/generated/**"]
+    },
+    "build": {
+      "dependsOn": ["^build", "db:generate"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.test.ts", "!**/*.test.tsx", "!**/*.md"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": ["NEXT_PUBLIC_*"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "db:generate"]
+    },
+    "lint": {
+      "dependsOn": ["^build", "db:generate"]
+    },
+    "test": {
+      "dependsOn": ["^build", "db:generate"],
+      "outputs": ["coverage/**"],
+      "passThroughEnv": ["DATABASE_URL", "TEST_DATABASE_URL", "REDIS_URL", "API_*", "LOG_LEVEL"]
+    },
+    "dev": {
+      "dependsOn": ["^build", "db:generate"],
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["*"]
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

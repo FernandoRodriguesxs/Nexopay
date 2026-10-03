@@ -1,0 +1,35 @@
+{
+  "name": "nexopay",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.1",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.x",
+      "onFail": "download"
+    }
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rimraf node_modules/.cache .turbo",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm format:check && turbo run lint typecheck test build",
+    "db:generate": "turbo run db:generate --filter=@nexopay/database",
+    "db:migrate": "pnpm --filter @nexopay/database db:migrate",
+    "db:studio": "pnpm --filter @nexopay/database db:studio",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  },
+  "devDependencies": {
+    "prettier": "catalog:",
+    "rimraf": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
+  }
+}
