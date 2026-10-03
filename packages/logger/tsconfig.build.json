@@ -1,0 +1,5 @@
+{
+  "extends": "@nexopay/config/tsconfig/node-library.json",
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}
